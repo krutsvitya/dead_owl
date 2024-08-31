@@ -16,7 +16,7 @@ df = pd.read_excel(file_path, sheet_name=sheet_name)
 data_dict = {}
 
 column_names = df.columns
-print(column_names)
+# print(column_names)
 
 column1 = df['Original']  # Замените 'Column1' на название первого столбца
 column2 = df['Translate']  # Замените 'Column2' на название второго столбца
@@ -46,7 +46,7 @@ def start(message):
 
             user_data['dict'] = data
             data_dict[message.chat.id] = user_data
-            print(data_dict[message.chat.id]["time"])
+            # print(data_dict[message.chat.id]["time"])
 
             bot.send_message(message.chat.id, 'Начали!')
 
@@ -67,7 +67,7 @@ def start(message):
             pass
             start(message)
             help(message)
-        print(f"Файл {file} не найден. Будет создан новый файл.")
+        # print(f"Файл {file} не найден. Будет создан новый файл.")
     # bot.send_message(message.chat.id, "Начали!")
 
     return data_dict
@@ -99,7 +99,7 @@ def get_dictionary(message):
     words = ''
     data = data_dict[message.chat.id]['dict']
     for item in data:
-        print(item + ": " + data[item])
+        # print(item + ": " + data[item])
         if words == '':
             words = item + ": " + data[item]
         else:
@@ -129,11 +129,11 @@ def add_new_word(message):
 
 
 def add_new_word_process(message):
-    print(message.text)
+    # print(message.text)
     data = data_dict[message.chat.id]["dict"]
 
     command_with_args = message.text.split()
-    print(command_with_args)
+    # print(command_with_args)
 
     if len(command_with_args) == 2:
         key = command_with_args[0]
@@ -175,7 +175,7 @@ def delete_word_process(message):
 def create_quiz(message):
     data_dict[message.chat.id]['quiz'] = True
     while data_dict[message.chat.id]['quiz']:
-        print(data_dict[message.chat.id]['quiz'])
+        # print(data_dict[message.chat.id]['quiz'])
         my_dict = data_dict[message.chat.id]['dict']
 
         if len(my_dict) < 4:
@@ -187,7 +187,7 @@ def create_quiz(message):
         question = words[randint(0, length)]
         answer = my_dict[question]
         words.remove(question)
-        print(question)
+        # print(question)
 
         options = []
         while len(options) < 3:
@@ -197,7 +197,7 @@ def create_quiz(message):
             words.remove(words[x])
             options.append(word)
 
-        print(options)
+        # print(options)
         options.insert(randint(0, 3), answer)
         # print(my_dict[question])
         bot.send_poll(
@@ -209,15 +209,14 @@ def create_quiz(message):
             is_anonymous=False
         )
         bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
-        # time.sleep(60 * data_dict[message.chat.id]["time"])
-        time.sleep(20)
+        time.sleep(60 * data_dict[message.chat.id]["time"])
 
 
 @bot.message_handler(commands=['stop_quiz'])
 def stop_quiz(message):
     data_dict[message.chat.id]['quiz'] = False
     bot.send_message(message.chat.id, "Квиз остановлен. Выберите следующее действие: ", reply_markup=markup)
-    print(data_dict[message.chat.id]['quiz'])
+    # print(data_dict[message.chat.id]['quiz'])
 
 
 @bot.message_handler(commands=['set_period'])
