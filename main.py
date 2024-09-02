@@ -3,10 +3,8 @@ import pandas as pd
 from random import randint
 import time
 from telebot import types
-
-BOT_TOKEN = '7479339906:AAFJ0dYHhhZCoDkeIL9ObsSKSM2NSGW4dCI'
-
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode=None)
+import pickle
+from database import Dictionary, record_exists
 
 file_path = 'data.xlsx'
 sheet_name = 'table1'
@@ -25,52 +23,51 @@ dictionary = dict()
 for item, item2 in zip(column1, column2):
     dictionary[item.strip('\xa0')] = item2.strip('\xa0')
 
+BOT_TOKEN = '7479339906:AAFJ0dYHhhZCoDkeIL9ObsSKSM2NSGW4dCI'
+
+bot = telebot.TeleBot(BOT_TOKEN, parse_mode=None)
+
 markup = types.InlineKeyboardMarkup()
+
+button1 = types.InlineKeyboardButton('Начать', callback_data='/start')
+button2 = types.InlineKeyboardButton("Помощь", callback_data='/help')
+button3 = types.InlineKeyboardButton("Мой словарь", callback_data='/dictionary')
+button4 = types.InlineKeyboardButton('Добавить новое слово', callback_data='/add_new_word')
+button5 = types.InlineKeyboardButton('Удалить слово', callback_data='/delete_word')
+button6 = types.InlineKeyboardButton('Начать квиз', callback_data='/start_quiz')
+button7 = types.InlineKeyboardButton('Изменить частоту вопросов', callback_data='/set_period')
+button8 = types.InlineKeyboardButton('Остановить квиз', callback_data='/stop_quiz')
+markup.add(button1, button2, button3, button4, button5, button6, button7, button8)
+
+
+def show_keyboard(message):
+    bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+
+
+# class Dictionary:
+#
+#     def __init__(self, chat_id):
+#         self.__chat_id = chat_id
+#         self._period = 60
+#         self._my_dict = {}
+#
+#     def set_period(self, new_period):
+#         self._period = new_period
+#
+#     def add_new_word(self, word, translate):
+#         self._my_dict[word] = translate
 
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    try:
-        with open(f'dictionaries/{message.chat.id}-dict.txt', 'r', encoding='utf-8') as file:
-            data = {}
-            user_data = {
-                "dict": data,
-                "time": 60,
-                "quiz": False
-            }
-
-            for line in file:
-                if ':' in line:
-                    key, value = line.strip().split(':', 1)
-                    data[key.strip()] = value.strip()
-
-            user_data['dict'] = data
-            data_dict[message.chat.id] = user_data
-            # print(data_dict[message.chat.id]["time"])
-
-            bot.send_message(message.chat.id, 'Начали!')
-
-            button1 = types.InlineKeyboardButton('Начать', callback_data='/start')
-            button2 = types.InlineKeyboardButton("Помощь", callback_data='/help')
-            button3 = types.InlineKeyboardButton("Мой словарь", callback_data='/dictionary')
-            button4 = types.InlineKeyboardButton('Добавить новое слово', callback_data='/add_new_word')
-            button5 = types.InlineKeyboardButton('Удалить слово', callback_data='/delete_word')
-            button6 = types.InlineKeyboardButton('Начать квиз', callback_data='/start_quiz')
-            button7 = types.InlineKeyboardButton('Изменить частоту вопросов', callback_data='/set_time_period')
-            button8 = types.InlineKeyboardButton('Остановить квиз', callback_data='/stop_quiz')
-            markup.add(button1, button2, button3, button4, button5, button6, button7, button8)
-
-            bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
-
-    except FileNotFoundError:
-        with open(f'dictionaries/{message.chat.id}-dict.txt', 'w') as file:
-            pass
-            start(message)
-            help(message)
-        # print(f"Файл {file} не найден. Будет создан новый файл.")
-    # bot.send_message(message.chat.id, "Начали!")
-
-    return data_dict
+    if record_exists(message.chat.id):
+        bot.send_message(message.chat.id, 'Твой словарик у меня уже есть!')
+        show_keyboard(message)
+    else:
+        new_dictionary = Dictionary(chat_id=message.chat.id, period=60, my_dict={}, quiz=False)
+        Dictionary.save(new_dictionary)
+        bot.send_message(message.chat.id, 'Поехали!')
+        show_keyboard(message)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -88,16 +85,18 @@ def callback_handler(call):
         start(message)
     elif call.data == "/start_quiz":
         create_quiz(message)
+    elif call.data == "/set_period":
+        print('lalalalala')
+        set_period(message)
     elif call.data == "/stop_quiz":
         stop_quiz(message)
-    elif call.data == "/set_period":
-        set_time_period(message)
 
 
 @bot.message_handler(commands=['dictionary'])
 def get_dictionary(message):
+    loaded_obj = Dictionary.load(str(message.chat.id))
+    data = loaded_obj.my_dict
     words = ''
-    data = data_dict[message.chat.id]['dict']
     for item in data:
         # print(item + ": " + data[item])
         if words == '':
@@ -105,19 +104,19 @@ def get_dictionary(message):
         else:
             words = words + '\n' + item + ": " + data[item]
     bot.send_message(message.chat.id, words)
-    bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+    show_keyboard(message)
 
 
-def write_dict_to_file(filename, data):
-    with open(filename, 'a', encoding='utf-8') as file:
-        for key, value in data.items():
-            file.write(f"{key}: {value}\n")
+# def write_dict_to_file(filename, data):
+#     with open(filename, 'a', encoding='utf-8') as file:
+#         for key, value in data.items():
+#             file.write(f"{key}: {value}\n")
 
 
-def save_data_to_file(filename, data):
-    with open(filename, 'w', encoding='utf-8') as file:
-        for key, value in data.items():
-            file.write(f"{key}: {value}\n")
+# def save_data_to_file(filename, data):
+#     with open(filename, 'w', encoding='utf-8') as file:
+#         for key, value in data.items():
+#             file.write(f"{key}: {value}\n")
 
 
 @bot.message_handler(commands=['add_new_word'])
@@ -129,23 +128,23 @@ def add_new_word(message):
 
 
 def add_new_word_process(message):
-    # print(message.text)
-    data = data_dict[message.chat.id]["dict"]
+    loaded_obj = Dictionary.load(str(message.chat.id))
 
     command_with_args = message.text.split()
-    # print(command_with_args)
 
     if len(command_with_args) == 2:
         key = command_with_args[0]
         value = command_with_args[1]
-        data[key] = value
-        save_data_to_file(f'dictionaries/{message.chat.id}-dict.txt', data)
+
+        loaded_obj.my_dict[key] = value
+        Dictionary.save(loaded_obj)
+
         bot.send_message(message.chat.id, 'Слово успешно добавлено!')
-        bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
-        return data
+        show_keyboard(message)
+
     else:
         bot.send_message(message.chat.id, 'Нужно только 1 слово и его перевод!')
-        bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+        show_keyboard(message)
 
 
 @bot.message_handler(commands=['delete_word'])
@@ -156,33 +155,38 @@ def delete_word(message):
 
 
 def delete_word_process(message):
+    loaded_obj = Dictionary.load(str(message.chat.id))
+    data = loaded_obj.my_dict
     command_with_args = message.text.split()
     print(command_with_args)
     if len(command_with_args) == 1:
-        if command_with_args[0] not in data_dict[message.chat.id]['dict']:
+        if command_with_args[0] not in data:
             bot.send_message(message.chat.id, 'Такого слова нет в вашем словаре!')
-        elif command_with_args[0] in data_dict[message.chat.id]['dict']:
-            data_dict[message.chat.id]['dict'].pop(command_with_args[0])
+        elif command_with_args[0] in data:
+            data.pop(command_with_args[0])
+            Dictionary.save(loaded_obj)
             bot.send_message(message.chat.id, 'Слово успешно удалено!')
-            bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+            show_keyboard(message)
     else:
         bot.send_message(message.chat.id, 'Для удаления слова нужно указать команду /delete_word и слово которое'
                                           ' вы хотите удалить(не его перевод, а само слово). Пример: /delete dog')
-        bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+        show_keyboard(message)
 
 
 @bot.message_handler(commands=['start_quiz'])
 def create_quiz(message):
-    data_dict[message.chat.id]['quiz'] = True
-    while data_dict[message.chat.id]['quiz']:
+    loaded_obj = Dictionary.load(str(message.chat.id))
+    loaded_obj.quiz = True
+    Dictionary.save(loaded_obj)
+    while loaded_obj.quiz:
         # print(data_dict[message.chat.id]['quiz'])
-        my_dict = data_dict[message.chat.id]['dict']
+        my_dict = loaded_obj.my_dict
 
         if len(my_dict) < 4:
             bot.send_message(message.chat.id, "В вашем словаре должно быть минимум 4 слова для того чтобы начать!")
             return 0
 
-        words = list(data_dict[message.chat.id]['dict'].keys())
+        words = list(my_dict.keys())
         length = len(my_dict) - 1
         question = words[randint(0, length)]
         answer = my_dict[question]
@@ -209,27 +213,39 @@ def create_quiz(message):
             is_anonymous=False
         )
         bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
-        time.sleep(60 * data_dict[message.chat.id]["time"])
+        time.sleep(10)
+        loaded_obj = Dictionary.load(str(message.chat.id))
 
 
 @bot.message_handler(commands=['stop_quiz'])
 def stop_quiz(message):
-    data_dict[message.chat.id]['quiz'] = False
+    loaded_dict = Dictionary.load(str(message.chat.id))
+    loaded_dict.quiz = False
+    Dictionary.save(loaded_dict)
     bot.send_message(message.chat.id, "Квиз остановлен. Выберите следующее действие: ", reply_markup=markup)
     # print(data_dict[message.chat.id]['quiz'])
 
 
 @bot.message_handler(commands=['set_period'])
-def set_time_period(message):
+def set_period(message):
+    bot.send_message(message.chat.id, "Укажите в минутах, как часто вы хотите получать вопрос квиза: ")
+    bot.register_next_step_handler(message, set_period_process)
+
+
+def set_period_process(message):
+    loaded_dict = Dictionary.load(str(message.chat.id))
     command_with_args = message.text.split()
-    if len(command_with_args) == 2:
-        data_dict[message.chat.id]['time'] = str(command_with_args[1])
-        bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+    if len(command_with_args) == 1:
+        loaded_dict.period = str(command_with_args[0])
+        Dictionary.save(loaded_dict)
+        bot.send_message(message.chat.id, "Период изменен.")
+        show_keyboard(message)
+        print(Dictionary.load(str(message.chat.id)).period)
     else:
         bot.send_message(message.chat.id, 'Нужно указать команду и время в минутах, как часто вы хотите получать'
                                           ' вопросы с квиза. Например: /set_period 60. Тогда вы будете получать'
                                           ' 1 вопррс в час.')
-        bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
+        show_keyboard(message)
 
 
 @bot.message_handler(commands=['help'])
