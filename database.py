@@ -54,10 +54,9 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-update_existing_records()
 
-loaded_obj = Dictionary.load("211667308")
-if loaded_obj:
-    print(f"Loaded from DB: {loaded_obj.chat_id}, {loaded_obj.period}, {loaded_obj.my_dict}")
+# loaded_obj = Dictionary.load("211667308")
+# if loaded_obj:
+#     print(f"Loaded from DB: {loaded_obj.chat_id}, {loaded_obj.period}, {loaded_obj.my_dict}")
 
 
