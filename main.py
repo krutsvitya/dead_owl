@@ -9,8 +9,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('C:/Users/Victor Kruts/Desktop/dead-owl-7c4759a624ca'
-                                                         '.json', scope)
+creds = ServiceAccountCredentials.from_json_keyfile_name('dead-owl-7c4759a624ca.json', scope)
 client = gspread.authorize(creds)
 
 # Вставьте идентификатор вашей таблицы
