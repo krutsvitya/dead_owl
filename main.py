@@ -5,23 +5,16 @@ import time
 from telebot import types
 import pickle
 from database import Dictionary, record_exists
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-file_path = 'data.xlsx'
-sheet_name = 'table1'
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name('C:/Users/Victor Kruts/Desktop/dead-owl-7c4759a624ca'
+                                                         '.json', scope)
+client = gspread.authorize(creds)
 
-df = pd.read_excel(file_path, sheet_name=sheet_name)
-
-data_dict = {}
-
-column_names = df.columns
-# print(column_names)
-
-column1 = df['Original']  # Замените 'Column1' на название первого столбца
-column2 = df['Translate']  # Замените 'Column2' на название второго столбца
-
-dictionary = dict()
-for item, item2 in zip(column1, column2):
-    dictionary[item.strip('\xa0')] = item2.strip('\xa0')
+# Вставьте идентификатор вашей таблицы
+spreadsheet_id = '1XmezWAWkYB64nX1llWarvgrUYKr0-StjuE1jsqmkK3M'
 
 BOT_TOKEN = '7479339906:AAFJ0dYHhhZCoDkeIL9ObsSKSM2NSGW4dCI'
 
@@ -37,7 +30,8 @@ button5 = types.InlineKeyboardButton('Удалить слово', callback_data=
 button6 = types.InlineKeyboardButton('Начать квиз', callback_data='/start_quiz')
 button7 = types.InlineKeyboardButton('Изменить частоту вопросов', callback_data='/set_period')
 button8 = types.InlineKeyboardButton('Остановить квиз', callback_data='/stop_quiz')
-markup.add(button1, button2, button3, button4, button5, button6, button7, button8)
+button9 = types.InlineKeyboardButton('Импортировать слова', callback_data='/from_table')
+markup.add(button1, button2, button3, button4, button5, button6, button7, button8, button9)
 
 
 def show_keyboard(message):
@@ -90,6 +84,8 @@ def callback_handler(call):
         set_period(message)
     elif call.data == "/stop_quiz":
         stop_quiz(message)
+    elif call.data == "/from_table":
+        add_words_from_table(message)
 
 
 @bot.message_handler(commands=['dictionary'])
@@ -136,12 +132,14 @@ def add_new_word_process(message):
         key = command_with_args[0]
         value = command_with_args[1]
 
-        loaded_obj.my_dict[key] = value
-        Dictionary.save(loaded_obj)
+        if key not in loaded_obj.my_dict.keys():
+            loaded_obj.my_dict[key] = value
+            Dictionary.save(loaded_obj)
 
-        bot.send_message(message.chat.id, 'Слово успешно добавлено!')
-        show_keyboard(message)
-
+            bot.send_message(message.chat.id, 'Слово успешно добавлено!')
+            show_keyboard(message)
+        else:
+            bot.send_message(message.chat.id, 'Это слово уже есть у вас в словаре!')
     else:
         bot.send_message(message.chat.id, 'Нужно только 1 слово и его перевод!')
         show_keyboard(message)
@@ -149,27 +147,23 @@ def add_new_word_process(message):
 
 @bot.message_handler(commands=['delete_word'])
 def delete_word(message):
-    bot.send_message(message.chat.id, "После этого сообщения укажите пожалуйста слово которое вы хотите удалить из"
-                                      " вашего словаря. Например: Dog\nНужно написать слово,а не его перевод.")
+    bot.send_message(message.chat.id, "Напишите слово которое вы хотите удалить из словаря")
     bot.register_next_step_handler(message, delete_word_process)
 
 
 def delete_word_process(message):
     loaded_obj = Dictionary.load(str(message.chat.id))
     data = loaded_obj.my_dict
-    command_with_args = message.text.split()
-    print(command_with_args)
-    if len(command_with_args) == 1:
-        if command_with_args[0] not in data:
-            bot.send_message(message.chat.id, 'Такого слова нет в вашем словаре!')
-        elif command_with_args[0] in data:
-            data.pop(command_with_args[0])
-            Dictionary.save(loaded_obj)
-            bot.send_message(message.chat.id, 'Слово успешно удалено!')
-            show_keyboard(message)
+    deletable_word = message.text
+    print(deletable_word)
+    if deletable_word in loaded_obj.my_dict.keys():
+        data.pop(deletable_word)
+        Dictionary.save(loaded_obj)
+        bot.send_message(message.chat.id, 'Слово успешно удалено!')
+        show_keyboard(message)
     else:
-        bot.send_message(message.chat.id, 'Для удаления слова нужно указать команду /delete_word и слово которое'
-                                          ' вы хотите удалить(не его перевод, а само слово). Пример: /delete dog')
+        bot.send_message(message.chat.id, 'Такого слова нет в вашем словаре!')
+        delete_word(message)
         show_keyboard(message)
 
 
@@ -213,7 +207,7 @@ def create_quiz(message):
             is_anonymous=False
         )
         bot.send_message(message.chat.id, "Выберите действие: ", reply_markup=markup)
-        time.sleep(10)
+        time.sleep(60 * loaded_obj.period)
         loaded_obj = Dictionary.load(str(message.chat.id))
 
 
@@ -246,6 +240,56 @@ def set_period_process(message):
                                           ' вопросы с квиза. Например: /set_period 60. Тогда вы будете получать'
                                           ' 1 вопррс в час.')
         show_keyboard(message)
+
+
+@bot.message_handler(commands=['from_table'])
+def add_words_from_table(message):
+    bot.send_message(message.chat.id, "Чтобы бот мог импортировать вашу гугл таблицу вам нужно:\n"
+                                      "1. Создать гугл таблицу и в первый столбец добавить слова которые вы хотите"
+                                      " учить, а во второй слобец перевод этих слов.\n"
+                                      "2. Теперь вам нужно дать права доступа к таблице. Нужно дать доступ - "
+                                      "'Все у кого есть ссылка' с доступом читатель.\n"
+                                      "3. После этого скопировать ссылку на таблицу и отправить ее в бот.\n"
+                                      "4. После этого ваши слова добавятся в таблицу!")
+    bot.send_message(message.chat.id, "Отправьте ссылку на гугл таблицу: ")
+    bot.register_next_step_handler(message, add_words_from_table_process)
+
+
+def add_words_from_table_process(message):
+    loaded_dict = Dictionary.load(str(message.chat.id))
+    if message.text.startswith('https://docs.google.com/spreadsheets/d/'):
+        identifier = message.text.split('/')[5]
+        print(identifier)
+        try:
+            sheet = client.open_by_key(identifier).sheet1
+            column1 = sheet.col_values(1)
+            column2 = sheet.col_values(2)
+            old_words = []
+
+            for item, item2 in zip(column1, column2):
+                if item in loaded_dict.my_dict.keys():
+                    old_words.append(item)
+                    continue
+                else:
+                    loaded_dict.my_dict[item] = item2
+            print("Данные успешно добавлены в словарь!")
+            if len(old_words) > 0:
+                result = ', '.join(old_words)
+                bot.send_message(message.chat.id, f"Слово(а): {result} были пропущены, так как они уже есть"
+                                                  f" в вашем словаре")
+            bot.send_message(message.chat.id, "Данные успешно добавлены в словарь! Нажмите на 'Мой словарь'"
+                                              " чтобы проверить!")
+            Dictionary.save(loaded_dict)
+            show_keyboard(message)
+        except gspread.SpreadsheetNotFound:
+            print("Таблица не найдена. Проверьте идентификатор и доступ.")
+            show_keyboard(message)
+        except Exception as e:
+            print(f"Произошла ошибка: {e}")
+            show_keyboard(message)
+    else:
+        bot.send_message(message.chat.id, "Неверная ссылка!")
+        add_words_from_table(message)
 
 
 @bot.message_handler(commands=['help'])
