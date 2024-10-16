@@ -6806,3 +6806,5 @@ Traceback (most recent call last):
     raise ConnectTimeout(e, request=request)
 requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot7479339906:***********************************/getUpdates?offset=395064108&timeout=20 (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x000001C87BAA12E0>, 'Connection to api.telegram.org timed out. (connect timeout=20)'))
 
+2024-10-16 23:32:10,921 - ERROR - Infinity polling: polling exited
+2024-10-16 23:32:10,921 - ERROR - Break infinity polling
