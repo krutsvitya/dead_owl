@@ -1,3 +1,1 @@
 fly.toml
-
-CMD ["python", "main.py"]
