@@ -1,3 +1,4 @@
+import telebot.apihelper
 from telebot import types
 from random import randint
 import time
@@ -600,6 +601,7 @@ def main():
     for user in active_quiz_users:
         logging.info(f'Продолжаем квиз пользователю: {user.chat_id}!')
         start_quiz_in_thread(user.chat_id)
+
 
     bot.infinity_polling()
 
